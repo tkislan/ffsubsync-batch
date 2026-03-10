@@ -191,27 +191,25 @@ def run_sync_parallel(
     with mp.Pool(processes=config.workers, maxtasksperchild=1) as pool:
         results = pool.map(worker_fn, jobs)
 
-    if config.dry_run:
-        for _ in results:
-            stats.synced += 1
-        return stats
-
     for result in results:
         task = task_map[(result.video_path, result.subtitle_path)]
         srt_path = task.srt_path
         output_path = task.output_path
         backup_path = task.backup_path
 
-        if result.success and output_path.is_file():
+        if result.success and (output_path.is_file() or config.dry_run):
             try:
-                shutil.move(str(output_path), str(srt_path))
+                logger.info("  Moving %s to %s", output_path, srt_path)
+                if not config.dry_run:
+                    shutil.move(str(output_path), str(srt_path))
                 stats.synced += 1
                 _log_sync_success(result, srt_path.name, logger)
             except OSError as e:
                 stats.failed += 1
                 stats.errors.append(f"Failed to replace original: {srt_path} ({e})")
                 logger.error("  Failed to replace %s with synced version: %s", srt_path, e)
-                restore_backup(backup_path, srt_path, logger)
+                if not config.dry_run:
+                    restore_backup(backup_path, srt_path, logger)
         else:
             stats.failed += 1
             error_msg = result.error or "Unknown error"
@@ -223,9 +221,10 @@ def run_sync_parallel(
                 error_msg,
             )
 
-            if output_path.is_file():
-                output_path.unlink(missing_ok=True)
+            if not config.dry_run:
+                if output_path.is_file():
+                    output_path.unlink(missing_ok=True)
 
-            restore_backup(backup_path, srt_path, logger)
+                restore_backup(backup_path, srt_path, logger)
 
     return stats

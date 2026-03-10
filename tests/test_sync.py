@@ -16,7 +16,12 @@ from ffsubsync_batch.sync import (
 
 
 def _test_config() -> Config:
-    return Config(sonarr_url="http://test:8989", sonarr_api_key="test-key", workers=1)
+    return Config(
+        sonarr_url="http://test:8989",
+        sonarr_api_key="test-key",
+        series_filter="test",
+        workers=1,
+    )
 
 
 def make_task(tmp_path: Path, name: str = "ep01") -> PendingSyncTask:
@@ -177,9 +182,7 @@ class TestRunSyncParallel:
                 elapsed_seconds=0.1,
             )
 
-        stats = run_sync_parallel(
-            fake_worker, [task_ok, task_fail], _test_config(), logger
-        )
+        stats = run_sync_parallel(fake_worker, [task_ok, task_fail], _test_config(), logger)
 
         assert stats.synced == 1
         assert stats.failed == 1

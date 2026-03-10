@@ -11,13 +11,16 @@ class TestConfigFromEnv:
     def test_required_fields_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SONARR_URL", "http://sonarr:8989")
         monkeypatch.setenv("SONARR_API_KEY", "abc123")
+        monkeypatch.setenv("SERIES_FILTER", "MyShow")
         config = CliApp.run(Config, cli_args=[])
         assert config.sonarr_url == "http://sonarr:8989"
         assert config.sonarr_api_key == "abc123"
+        assert config.series_filter == "MyShow"
 
     def test_defaults_applied(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SONARR_URL", "http://localhost:8989")
         monkeypatch.setenv("SONARR_API_KEY", "key")
+        monkeypatch.setenv("SERIES_FILTER", "test")
         config = CliApp.run(Config, cli_args=[])
         assert config.max_offset == 120
         assert config.dry_run is False
@@ -30,6 +33,7 @@ class TestConfigFromEnv:
     def test_env_overrides_defaults(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SONARR_URL", "http://example.com")
         monkeypatch.setenv("SONARR_API_KEY", "key")
+        monkeypatch.setenv("SERIES_FILTER", "test")
         monkeypatch.setenv("MAX_OFFSET", "300")
         monkeypatch.setenv("DRY_RUN", "true")
         monkeypatch.setenv("WORKERS", "8")
@@ -47,6 +51,7 @@ class TestConfigFromCLI:
     def test_cli_args_override_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SONARR_URL", "http://from-env:8989")
         monkeypatch.setenv("SONARR_API_KEY", "env-key")
+        monkeypatch.setenv("SERIES_FILTER", "test")
         config = CliApp.run(Config, cli_args=["--sonarr_url", "http://from-cli:8989"])
         assert config.sonarr_url == "http://from-cli:8989"
         assert config.sonarr_api_key == "env-key"

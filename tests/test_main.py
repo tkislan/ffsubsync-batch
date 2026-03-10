@@ -28,7 +28,7 @@ def make_config(tmp_path: Path, **overrides: Any) -> Config:
         "max_offset": 120,
         "reference_stream": "a:0",
         "vad": "subs_then_webrtc",
-        "series_filter": "",
+        "series_filter": "Series A",
     }
     defaults.update(overrides)
     return Config(**defaults)
@@ -68,7 +68,7 @@ class TestCollectSyncTasks:
             assert task.backup_path.exists()
 
     @responses_mock.activate
-    def test_multiple_series_multiple_episodes(
+    def test_filter_matching_multiple_series_returns_empty(
         self, media_tree: dict[str, Any], logger: logging.Logger, tmp_path: Path
     ) -> None:
         series_a_dir = str(media_tree["series_a_dir"])
@@ -82,33 +82,12 @@ class TestCollectSyncTasks:
                 make_sonarr_series_json(2, "Series B", series_b_dir),
             ],
         )
-        responses_mock.add(
-            responses_mock.GET,
-            f"{SONARR_URL}/api/v3/episodefile",
-            json=[
-                make_sonarr_episode_file_json(
-                    10, 1, 1, str(media_tree["vid_a1"]), "Season 01/Series A - S01E01.mkv"
-                ),
-                make_sonarr_episode_file_json(
-                    11, 1, 1, str(media_tree["vid_a2"]), "Season 01/Series A - S01E02.mkv"
-                ),
-            ],
-        )
-        responses_mock.add(
-            responses_mock.GET,
-            f"{SONARR_URL}/api/v3/episodefile",
-            json=[
-                make_sonarr_episode_file_json(
-                    20, 2, 1, str(media_tree["vid_b1"]), "Season 01/Series B - S01E01.mkv"
-                ),
-            ],
-        )
 
-        config = make_config(tmp_path)
+        config = make_config(tmp_path, series_filter="Series")
         client = SonarrClient(SONARR_URL, "test-key")
         tasks = collect_sync_tasks(client, config, logger)
 
-        assert len(tasks) == 4
+        assert tasks == []
 
     @responses_mock.activate
     def test_dry_run_collects_tasks_without_backups(
@@ -216,7 +195,7 @@ class TestCollectSyncTasks:
             ],
         )
 
-        config = make_config(tmp_path)
+        config = make_config(tmp_path, series_filter="Show")
         client = SonarrClient(SONARR_URL, "test-key")
         tasks = collect_sync_tasks(client, config, logger)
 
@@ -329,7 +308,7 @@ class TestMainIntegration:
                 elapsed_seconds=0.1,
             )
 
-        config = make_config(tmp_path)
+        config = make_config(tmp_path, series_filter="Series B")
         log = logging.getLogger("test_e2e_fail")
         log.handlers.clear()
         log.addHandler(logging.NullHandler())

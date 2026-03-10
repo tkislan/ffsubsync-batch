@@ -10,10 +10,9 @@ class Config(BaseSettings):
     sonarr_url: str = Field(description="Sonarr base URL, e.g. http://sonarr:8989")
     sonarr_api_key: str = Field(description="Sonarr API key")
     series_filter: str = Field(
-        default="",
-        description="Optional substring filter on series title (case-insensitive)",
+        description="Substring filter on series title "
+        "(case-insensitive); must match exactly one series",
     )
-    log_file: str = Field(default="/tmp/ffsubsync-batch.log")
     max_offset: int = Field(default=120, description="Max offset in seconds for ffsubsync")
     dry_run: bool = Field(
         default=False,
