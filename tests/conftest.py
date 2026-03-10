@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -109,3 +110,21 @@ def make_sonarr_episode_file_json(
             "revision": {"version": 1, "real": 0},
         },
     }
+
+
+class _DirectPool:
+    """A fake multiprocessing pool that runs map() calls in the current process."""
+
+    def map(self, fn: Callable[..., Any], iterable: Any) -> list[Any]:
+        return [fn(item) for item in iterable]
+
+    def __enter__(self) -> _DirectPool:
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        pass
+
+
+def make_direct_pool(_workers: int) -> _DirectPool:
+    """Drop-in replacement for ``create_pool`` that avoids multiprocessing."""
+    return _DirectPool()

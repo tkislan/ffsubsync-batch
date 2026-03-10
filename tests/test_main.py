@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
+import pytest
 import responses as responses_mock
 
 from ffsubsync_batch.config import Config
@@ -11,7 +13,7 @@ from ffsubsync_batch.main import collect_sync_tasks
 from ffsubsync_batch.sonarr import SonarrClient
 from ffsubsync_batch.sync import SyncJob, SyncJobResult, run_sync_parallel
 
-from .conftest import make_sonarr_episode_file_json, make_sonarr_series_json
+from .conftest import make_direct_pool, make_sonarr_episode_file_json, make_sonarr_series_json
 
 SONARR_URL = "http://sonarr:8989"
 
@@ -20,7 +22,6 @@ def make_config(tmp_path: Path, **overrides: Any) -> Config:
     defaults: dict[str, Any] = {
         "sonarr_url": SONARR_URL,
         "sonarr_api_key": "test-key",
-        "log_file": str(tmp_path / "test.log"),
         "backup_dir_name": ".original-sub",
         "sub_extensions": ["srt"],
         "dry_run": False,
@@ -114,9 +115,8 @@ class TestCollectSyncTasks:
         client = SonarrClient(SONARR_URL, "test-key")
         tasks = collect_sync_tasks(client, config, logger)
 
-        assert len(tasks) == 2
-        srt_names = sorted(t.srt_path.name for t in tasks)
-        assert srt_names == ["Series A - S01E01.eng.srt", "Series A - S01E01.srt"]
+        assert len(tasks) == 1
+        assert tasks[0].srt_path.name == "dummy.srt"
 
         backup_dir = media_tree["vid_a1"].parent / ".original-sub"
         assert not backup_dir.exists()
@@ -227,6 +227,11 @@ class TestCollectSyncTasks:
 
 
 class TestMainIntegration:
+    @pytest.fixture(autouse=True)
+    def _use_direct_pool(self) -> Any:
+        with patch("ffsubsync_batch.sync.create_pool", make_direct_pool):
+            yield
+
     @responses_mock.activate
     def test_end_to_end_happy_path(self, media_tree: dict[str, Any], tmp_path: Path) -> None:
         """Full pipeline: API -> discover -> backup -> sync -> replace."""

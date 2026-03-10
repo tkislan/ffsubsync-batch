@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import pytest
+
 from ffsubsync_batch.config import Config
 from ffsubsync_batch.sync import (
     PendingSyncTask,
@@ -13,6 +15,8 @@ from ffsubsync_batch.sync import (
     run_sync_parallel,
     worker_run_sync,
 )
+
+from .conftest import make_direct_pool
 
 
 def _test_config() -> Config:
@@ -113,6 +117,11 @@ class TestWorkerRunSync:
 
 
 class TestRunSyncParallel:
+    @pytest.fixture(autouse=True)
+    def _use_direct_pool(self) -> Any:
+        with patch("ffsubsync_batch.sync.create_pool", make_direct_pool):
+            yield
+
     def test_successful_sync_replaces_original(
         self, tmp_path: Path, logger: logging.Logger
     ) -> None:

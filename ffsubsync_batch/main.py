@@ -180,7 +180,7 @@ def main(cli_args: list[str] | None = None) -> int:
             logger.warning("  - %s", err)
 
     if stats.failed > 0:
-        logger.warning("%d file(s) failed. Check log: %s", stats.failed)
+        logger.warning("%d file(s) failed.", stats.failed)
         return 1
 
     return 0

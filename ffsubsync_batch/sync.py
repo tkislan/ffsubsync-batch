@@ -59,6 +59,11 @@ class PendingSyncTask:
     output_path: Path
 
 
+def create_pool(workers: int) -> mp.pool.Pool:
+    """Create a multiprocessing pool. Extracted so tests can patch it."""
+    return mp.Pool(processes=workers, maxtasksperchild=1)
+
+
 def run_ffsubsync(job: SyncJob) -> dict[str, Any]:
     """
     Run ffsubsync on a single job and return the raw result dict.
@@ -188,7 +193,7 @@ def run_sync_parallel(
 
     # maxtasksperchild=1 ensures each sync gets a completely fresh process,
     # preventing any leaked state (tqdm bars, ffmpeg handles) between runs
-    with mp.Pool(processes=config.workers, maxtasksperchild=1) as pool:
+    with create_pool(config.workers) as pool:
         results = pool.map(worker_fn, jobs)
 
     for result in results:
