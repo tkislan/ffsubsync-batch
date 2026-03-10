@@ -1,0 +1,91 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ffsubsync-batch
+  namespace: media
+  labels:
+    app: ffsubsync-batch
+spec:
+  ttlSecondsAfterFinished: 3600        # auto-delete 1 hour after completion
+  backoffLimit: 2
+  activeDeadlineSeconds: 14400         # hard kill after 4 hours
+
+  template:
+    metadata:
+      labels:
+        app: ffsubsync-batch
+    spec:
+      restartPolicy: Never
+
+      containers:
+      - name: ffsubsync
+        image: registry.example.com/ffsubsync-batch:1.0
+        env:
+        - name: SONARR_URL
+          value: "http://sonarr.media.svc.cluster.local:8989"
+        - name: SONARR_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: sonarr-api-key
+              key: api-key
+
+        # ── Parallelism ──
+        # Each worker spawns its own ffmpeg process, so 2 workers ≈ 2x throughput.
+        # Match to CPU request (each worker peaks ~1 core during audio extraction).
+        - name: WORKERS
+          value: "2"
+
+        # ── Optional: scope to one series ──
+        # - name: SERIES_FILTER
+        #   value: "Friends"
+
+        - name: MAX_OFFSET
+          value: "120"
+        - name: DRY_RUN
+          value: "false"
+        - name: REFERENCE_STREAM
+          value: "a:0"
+        - name: VAD
+          value: "subs_then_webrtc"
+        - name: BACKUP_DIR_NAME
+          value: ".original-sub"
+        - name: LOG_FILE
+          value: "/tmp/ffsubsync-batch.log"
+        # - name: SUB_EXTENSIONS
+        #   value: "srt|ass|ssa"
+
+        resources:
+          requests:
+            cpu: "2"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "4Gi"
+
+        volumeMounts:
+        - name: tv-media
+          mountPath: /tv
+
+      volumes:
+      - name: tv-media
+        persistentVolumeClaim:
+          claimName: sonarr-tv-pvc     # must be RWX
+
+      # Direct NFS alternative:
+      # - name: tv-media
+      #   nfs:
+      #     server: 192.168.1.100
+      #     path: /exports/tv
+      #     readOnly: false
+
+---
+# kubectl create secret generic sonarr-api-key \
+#   --from-literal=api-key='your-key-here' -n media
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sonarr-api-key
+  namespace: media
+type: Opaque
+data:
+  api-key: <base64-encoded-api-key>
