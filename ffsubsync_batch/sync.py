@@ -129,16 +129,10 @@ def worker_run_sync(job: SyncJob) -> SyncJobResult:
         )
 
 
-def _log_sync_success(
-    result: SyncJobResult, srt_name: str, logger: logging.Logger
-) -> None:
-    offset_str = (
-        f"{result.offset_seconds:.2f}s" if result.offset_seconds is not None else "?"
-    )
+def _log_sync_success(result: SyncJobResult, srt_name: str, logger: logging.Logger) -> None:
+    offset_str = f"{result.offset_seconds:.2f}s" if result.offset_seconds is not None else "?"
     scale_str = (
-        f"{result.framerate_scale_factor:.3f}"
-        if result.framerate_scale_factor is not None
-        else "?"
+        f"{result.framerate_scale_factor:.3f}" if result.framerate_scale_factor is not None else "?"
     )
     logger.info(
         "  SUCCESS (%.1fs, offset=%s, scale=%s): %s",
@@ -192,13 +186,15 @@ def run_sync_parallel(
         config.workers,
     )
 
-    if worker_fn is not worker_run_sync:
-        results = [worker_fn(job) for job in jobs]
-    else:
-        # maxtasksperchild=1 ensures each sync gets a completely fresh process,
-        # preventing any leaked state (tqdm bars, ffmpeg handles) between runs
-        with mp.Pool(processes=config.workers, maxtasksperchild=1) as pool:
-            results = pool.map(worker_fn, jobs)
+    # maxtasksperchild=1 ensures each sync gets a completely fresh process,
+    # preventing any leaked state (tqdm bars, ffmpeg handles) between runs
+    with mp.Pool(processes=config.workers, maxtasksperchild=1) as pool:
+        results = pool.map(worker_fn, jobs)
+
+    if config.dry_run:
+        for _ in results:
+            stats.synced += 1
+        return stats
 
     for result in results:
         task = task_map[(result.video_path, result.subtitle_path)]

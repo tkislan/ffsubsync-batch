@@ -2,18 +2,36 @@ from __future__ import annotations
 
 import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import requests
-
 from pydantic_settings import CliApp
 
 from ffsubsync_batch.config import Config
 from ffsubsync_batch.logging import setup_logging
 from ffsubsync_batch.sonarr import SonarrAPIError, SonarrClient
-from ffsubsync_batch.subtitles import backup_subtitle, find_subtitles
-from ffsubsync_batch.sync import PendingSyncTask, run_sync_parallel, worker_run_sync
+from ffsubsync_batch.subtitles import backup_subtitle, find_subtitles, next_backup_path
+from ffsubsync_batch.sync import (
+    PendingSyncTask,
+    SyncJob,
+    SyncJobResult,
+    run_sync_parallel,
+    worker_run_sync,
+)
 from ffsubsync_batch.toolcheck import check_ffmpeg, check_ffsubsync
+
+
+def create_worker_run_sync_dry_run(logger: logging.Logger) -> Callable[[SyncJob], SyncJobResult]:
+    def worker_run_sync_dry_run(job: SyncJob) -> SyncJobResult:
+        logger.info("    DRY RUN: would sync %s", job.subtitle_path)
+        return SyncJobResult(
+            video_path=job.video_path,
+            subtitle_path=job.subtitle_path,
+            success=True,
+        )
+
+    return worker_run_sync_dry_run
 
 
 def collect_sync_tasks(
@@ -72,17 +90,18 @@ def collect_sync_tasks(
                 logger.warning("  Video file missing: %s", ep_path)
                 continue
 
-            subtitles = find_subtitles(ep_path, config.sub_extensions)
+            subtitles = find_subtitles(ep_path, config.sub_extensions) if not config.dry_run else []
             for srt_path in subtitles:
                 logger.info("  FOUND SUB: %s", srt_path.name)
                 logger.info("    Video:   %s", ep_path.name)
 
-                if config.dry_run:
-                    logger.info("    DRY RUN: would sync %s", srt_path.name)
-                    continue
-
                 backup_dir = ep_path.parent / config.backup_dir_name
-                backup_path = backup_subtitle(srt_path, backup_dir, logger)
+
+                backup_path = (
+                    backup_subtitle(srt_path, backup_dir, logger)
+                    if not config.dry_run
+                    else next_backup_path(backup_dir, srt_path.name)
+                )
                 if backup_path is None:
                     logger.error("    Skipping (backup failed): %s", srt_path)
                     continue
@@ -126,15 +145,12 @@ def main(cli_args: list[str] | None = None) -> int:
     client = SonarrClient(config.sonarr_url, config.sonarr_api_key)
     tasks = collect_sync_tasks(client, config, logger)
 
-    if config.dry_run:
-        logger.info("Dry run complete. No subtitles were modified.")
-        return 0
-
     if not tasks:
         logger.info("No subtitles to sync.")
         return 0
 
-    stats = run_sync_parallel(worker_run_sync, tasks, config, logger)
+    worker_fn = worker_run_sync if not config.dry_run else create_worker_run_sync_dry_run(logger)
+    stats = run_sync_parallel(worker_fn, tasks, config, logger)
 
     logger.info("")
     logger.info("===== Batch run complete =====")

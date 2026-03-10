@@ -15,7 +15,10 @@ class Config(BaseSettings):
     )
     log_file: str = Field(default="/tmp/ffsubsync-batch.log")
     max_offset: int = Field(default=120, description="Max offset in seconds for ffsubsync")
-    dry_run: bool = Field(default=False)
+    dry_run: bool = Field(
+        default=False,
+        description="If set, list subtitles that would be synced without modifying any files",
+    )
     backup_dir_name: str = Field(
         default=".original-sub", description="Hidden backup directory name"
     )

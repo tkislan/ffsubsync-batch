@@ -111,7 +111,7 @@ class TestCollectSyncTasks:
         assert len(tasks) == 4
 
     @responses_mock.activate
-    def test_dry_run_creates_no_tasks(
+    def test_dry_run_collects_tasks_without_backups(
         self, media_tree: dict[str, Any], logger: logging.Logger, tmp_path: Path
     ) -> None:
         series_a_dir = str(media_tree["series_a_dir"])
@@ -135,7 +135,12 @@ class TestCollectSyncTasks:
         client = SonarrClient(SONARR_URL, "test-key")
         tasks = collect_sync_tasks(client, config, logger)
 
-        assert len(tasks) == 0
+        assert len(tasks) == 2
+        srt_names = sorted(t.srt_path.name for t in tasks)
+        assert srt_names == ["Series A - S01E01.eng.srt", "Series A - S01E01.srt"]
+
+        backup_dir = media_tree["vid_a1"].parent / ".original-sub"
+        assert not backup_dir.exists()
 
     @responses_mock.activate
     def test_series_filter_narrows_results(
