@@ -31,7 +31,7 @@ def make_config(tmp_path: Path, **overrides: Any) -> Config:
         "series_filter": "",
     }
     defaults.update(overrides)
-    return Config(_cli_parse_args=[], **defaults)
+    return Config(**defaults)
 
 
 class TestCollectSyncTasks:

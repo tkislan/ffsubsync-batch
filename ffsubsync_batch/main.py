@@ -6,6 +6,8 @@ from pathlib import Path
 
 import requests
 
+from pydantic_settings import CliApp
+
 from ffsubsync_batch.config import Config
 from ffsubsync_batch.logging import setup_logging
 from ffsubsync_batch.sonarr import SonarrAPIError, SonarrClient
@@ -100,7 +102,7 @@ def collect_sync_tasks(
 
 
 def main(cli_args: list[str] | None = None) -> int:
-    config = Config(_cli_parse_args=cli_args if cli_args is not None else sys.argv[1:])
+    config = CliApp.run(Config, cli_args=cli_args if cli_args is not None else sys.argv[1:])
     logger = setup_logging(config.log_file)
 
     logger.info("===== ffsubsync batch run started =====")
